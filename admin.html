@@ -43,6 +43,43 @@
     @media (max-width: 480px){ .floating-audio-btn{ right:12px; bottom:12px; width:44px; height:44px; } .floating-audio-btn .icon{ font-size: 18px; } }
     /* Respect any print or reduced-motion scenarios */
     @media (prefers-reduced-motion: reduce){ .floating-audio-btn{ transition: none; } }
+    
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity .2s;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      padding: 32px 24px 20px 24px;
+      min-width: 280px;
+      max-width: 90vw;
+      text-align: center;
+      font-family: inherit;
+    }
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 18px;
+      color: #333;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+    }
+    body.modal-open {
+      overflow: hidden;
+    }
   </style>
   <!-- Animated background: subtle grid + floating doodles -->
   <div class="animated-bg" aria-hidden="true">
@@ -75,9 +112,10 @@
 
   <div class="container">
     <!-- Background Music -->
-<audio id="bgMusic" preload="auto" loop muted playsinline>
-  <source src="CellOut.mp3" type="audio/mpeg">
-</audio>
+    <audio id="bgMusic" loop autoplay playsinline>
+      <source src="CellOut.wav" type="audio/wav">
+      Your browser does not support the audio element.
+    </audio>
 
     <!-- Floating Play/Pause Button -->
     <button id="audioToggle" type="button" class="floating-audio-btn" aria-label="สลับการเล่นเสียง" aria-pressed="false" title="เปิด/ปิดเสียง">
@@ -90,11 +128,22 @@
         <span>Vayu Few Few~~</span>
         <a id="answersLink" class="btn" style="padding:8px 12px; display:inline-flex; align-items:center; gap:6px; font-size:13px; text-decoration:none; border-radius:10px;"
            href="answers.html">
-          🧠 
+          ความลับ 
         </a>
         <button id="btnReset" class="btn warn" style="padding:8px 12px; display:inline-flex; align-items:center; gap:6px; font-size:13px;">
-          ♻️ 
+          รีห้อง 
         </button>
+      </div>
+
+      <!-- Modal for reset confirmation -->
+      <div id="modalReset" class="modal-overlay hidden">
+        <div class="modal-box">
+          <div class="modal-title">ยืนยันการล้างผู้เล่นทั้งหมดในห้องนี้?</div>
+          <div class="modal-actions">
+            <button id="modalResetConfirm" class="btn primary">ตกลง</button>
+            <button id="modalResetCancel" class="btn">ยกเลิก</button>
+          </div>
+        </div>
       </div>
 
       <!-- ปุ่มซ่อนข้อมูล + ป้ายห้อง -->
@@ -219,9 +268,35 @@ window.addEventListener('load', () => {
   });
 });
 
-document.getElementById('btnReset').addEventListener('click', async ()=>{
-  if(!confirm('ยืนยันล้างผู้เล่นทั้งหมดในห้องนี้?')) return;
+// Modal logic for reset confirmation
+const modalReset = document.getElementById('modalReset');
+const btnModalConfirm = document.getElementById('modalResetConfirm');
+const btnModalCancel = document.getElementById('modalResetCancel');
+
+function showModal() {
+  modalReset.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+}
+
+function hideModal() {
+  modalReset.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  showModal();
+});
+
+btnModalCancel.addEventListener('click', hideModal);
+
+btnModalConfirm.addEventListener('click', async () => {
+  hideModal();
   await window.resetRoom();
+});
+
+// Close modal when clicking outside
+modalReset.addEventListener('click', (e) => {
+  if (e.target === modalReset) hideModal();
 });
 
 // Floating audio toggle logic
