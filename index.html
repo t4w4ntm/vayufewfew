@@ -1,0 +1,481 @@
+
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+  <script src="questions.js"></script>
+  <!-- Tailwind (CDN) for toast styling; disable preflight to avoid CSS reset conflicts -->
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = { corePlugins: { preflight: false } };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Desktop-only compaction for index page */
+    @media (min-width: 700px){
+      body.index-page .header{ padding:12px 16px; }
+      body.index-page .main{ padding:16px; gap:12px; }
+      body.index-page .card{ padding:10px 14px; }
+      body.index-page .footer{ padding:10px 16px; }
+    }
+    @media (min-width:700px){
+  body.index-page .container{ width: min(720px, 100%); } /* หรือ 680 / 640 ตามชอบ */
+}
+  </style>
+</head>
+<body class="index-page">
+  <!-- Toast stack -->
+  <div id="toast-root" class="fixed top-4 right-4 z-[1200] space-y-2 pointer-events-none"></div>
+  <!-- Animated background: subtle grid + floating doodles -->
+  <div class="animated-bg" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-doodles">
+      <span class="doodle" style="--x:8%;  --size:44px; --delay:0s;">🎯</span>
+      <span class="doodle" style="--x:22%; --size:36px; --delay:2s;">🎮</span>
+      <span class="doodle" style="--x:38%; --size:40px; --delay:1s;">🏆</span>
+      <span class="doodle" style="--x:56%; --size:42px; --delay:3s;">⭐</span>
+      <span class="doodle" style="--x:72%; --size:34px; --delay:1.6s;">🎯</span>
+      <span class="doodle" style="--x:88%; --size:38px; --delay:2.6s;">🎮</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <div class="brand"><span class="dot"></span> <span>Vayu Few Few~~</span></div>
+      <div class="badge">Room: <span class="mono" id="roomLabel"></span></div>
+    </div>
+
+    <div class="main">
+
+      <section id="joinCard" class="card center">
+        <h2>เข้าร่วมเกม</h2>
+        <p class="muted">ใส่ชื่อของคุณ แล้วกด "เริ่มเกม"</p>
+        <input id="nameInput" class="name-input" placeholder="ชื่อเล่นของคุณ..." maxlength="24" />
+        <button id="btnStart" class="btn primary">เริ่มเกม</button>
+      </section>
+
+      <section id="confirmCard" class="card center hidden">
+        <h2>พร้อมมั้ยจ้ะ?</h2>
+        <p class="muted">พร้อมแล้วก็จัดเลยยย</p>
+        <div class="row">
+          <button id="btnReallyStart" class="btn success">พร้อม! เริ่มเลย</button>
+        </div>
+      </section>
+
+      <section id="quizCard" class="card hidden">
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div class="badge">ผู้เล่น: <span id="playerName" class="mono"></span></div>
+          <div class="badge">ข้อ <span id="qIndex">1</span>/10</div>
+        </div>
+        <div class="progress" aria-label="time">
+          <div id="timeBar" class="progress__bar"></div>
+        </div>
+        <div style="height:12px"></div>
+        <h3 id="qText"></h3>
+        <div id="choiceList" class="choices"></div>
+      </section>
+
+      <section id="resultCard" class="card center hidden">
+        <h2>เก่งมาก!</h2>
+        <p>อย่าพึ่งปิดหน้านี้! รอเฉลยจากพี่เอิร์ทสุดหล่อนะจ้ะ</p>
+        <div style="height:20px"></div>
+        <div id="answerSummary">
+          <h3>ตอบอะไรมั่งคับน้อง</h3>
+          <div id="playerAnswers" style="text-align:left; max-width:400px; margin:0 auto;"></div>
+        </div>
+      </section>
+
+    </div>
+    <div class="footer">
+      <small class="muted"></small>
+      <small class="muted"><span id="roomFooter" class="mono"></span></small>
+    </div>
+  </div>
+
+<script>
+// Simple Tailwind toast helper
+window.showToast = function(message, type = 'info', opts = {}){
+  try{
+    const root = document.getElementById('toast-root');
+    if(!root){ alert(message); return; }
+    const colors = {
+      info:    'bg-slate-800 text-white border border-slate-700',
+      success: 'bg-emerald-600 text-white',
+      warn:    'bg-amber-500 text-slate-900',
+      error:   'bg-rose-600 text-white'
+    };
+    const icon = {
+      info: '💬', success: '✅', warn: '⚠️', error: '⛔'
+    }[type] || '💬';
+    const div = document.createElement('div');
+    div.setAttribute('role','alert');
+    div.className = `pointer-events-auto shadow-xl rounded-xl px-3 py-2 flex items-center gap-2 ${colors[type] || colors.info} transition-all duration-200 opacity-0 translate-y-2`;
+    div.innerHTML = `<span class="text-lg">${icon}</span><div class="text-sm whitespace-pre-line">${message}</div>`;
+    root.appendChild(div);
+    requestAnimationFrame(()=>{ div.classList.remove('opacity-0','translate-y-2'); div.classList.add('opacity-100','translate-y-0'); });
+    let timeout = setTimeout(close, opts.duration || 3200);
+    function close(){
+      div.classList.add('opacity-0','translate-y-2');
+      setTimeout(()=>{ div.remove(); }, 180);
+    }
+    div.addEventListener('mouseenter', ()=>{ clearTimeout(timeout); });
+    div.addEventListener('mouseleave', ()=>{ timeout = setTimeout(close, 1600); });
+    div.addEventListener('click', close);
+  }catch(e){ alert(message); }
+}
+
+const roomId = window.ROOM_ID;
+document.getElementById('roomLabel').textContent = roomId;
+document.getElementById('roomFooter').textContent = roomId;
+
+const joinCard = document.getElementById('joinCard');
+const confirmCard = document.getElementById('confirmCard');
+const quizCard = document.getElementById('quizCard');
+const resultCard = document.getElementById('resultCard');
+
+const nameInput = document.getElementById('nameInput');
+const btnStart = document.getElementById('btnStart');
+const btnReallyStart = document.getElementById('btnReallyStart');
+
+// Debug: Check if elements exist
+console.log('DOM Elements check:');
+console.log('nameInput:', nameInput);
+console.log('btnStart:', btnStart);
+console.log('btnReallyStart:', btnReallyStart);
+
+if (!btnStart) {
+  console.error('btnStart element not found!');
+  window.showToast('ข้อผิดพลาด: ไม่พบปุ่มเริ่มเกม', 'error');
+}
+
+const qText = document.getElementById('qText');
+const choiceList = document.getElementById('choiceList');
+const timeBar = document.getElementById('timeBar');
+const scoreEl = document.getElementById('score');
+const qIndexEl = document.getElementById('qIndex');
+const playerNameEl = document.getElementById('playerName');
+const finalScoreEl = document.getElementById('finalScore');
+
+let uid = null;
+let playerRef = null;
+let score = 0;
+let order = [];
+let idx = 0;
+let qShownAt = 0;
+let timerId = null;
+let playerAnswers = []; // เก็บคำตอบของผู้เล่น
+
+const MAX_TIME = window.SPEED_BONUS_WINDOW_MS; // 10s bar
+const BAR_TICK_MS = 100;
+
+// Steps
+btnStart.addEventListener('click', async ()=>{
+  console.log('Start button clicked');
+  
+  try {
+    const name = (nameInput.value || '').trim();
+    if(!name){ 
+      window.showToast('กรุณาใส่ชื่อ', 'warn'); 
+      return; 
+    }
+    
+    console.log('Player name:', name);
+    console.log('Attempting to get/create user...');
+    
+    // Disable button to prevent multiple clicks
+    btnStart.disabled = true;
+    btnStart.textContent = 'กำลังเข้าสู่ระบบ...';
+    
+    // Try to get current user or create anonymous user
+    let currentUser = firebase.auth().currentUser;
+    if (!currentUser) {
+      console.log('No current user, signing in anonymously...');
+      await firebase.auth().signInAnonymously();
+      currentUser = firebase.auth().currentUser;
+    }
+    
+    if (!currentUser) {
+      throw new Error('ไม่สามารถสร้างผู้ใช้ได้');
+    }
+    
+    uid = currentUser.uid;
+    console.log('User UID:', uid);
+    
+    // Create simple unique player ID
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 10000);
+    const playerId = `player_${timestamp}_${random}`;
+    console.log('Generated player ID:', playerId);
+    
+    playerRef = firebase.firestore().collection('rooms').doc(roomId).collection('players').doc(playerId);
+    console.log('Player reference created for room:', roomId);
+    
+    console.log('Saving player data to Firestore...');
+    const playerData = { 
+      name: name, 
+      score: 0, 
+      ready: false, 
+      playerId: playerId,
+      joinedAt: firebase.firestore.FieldValue.serverTimestamp() 
+    };
+    
+    console.log('Player data:', playerData);
+    await playerRef.set(playerData);
+    
+    console.log('Player data saved successfully');
+
+    // Store reference globally for score updates
+    window.currentPlayerRef = playerRef;
+    window.currentPlayerId = playerId;
+
+    playerNameEl.textContent = name;
+    joinCard.classList.add('hidden');
+    confirmCard.classList.remove('hidden');
+    
+  } catch (error) {
+    console.error('Error details:', error);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    
+    let errorMsg = 'เกิดข้อผิดพลาด: ' + error.message;
+    
+    if (error.code === 'permission-denied') {
+      errorMsg += '\n\nกรุณาตรวจสอบ Firestore Security Rules';
+    } else if (error.code === 'unauthenticated') {
+      errorMsg += '\n\nปัญหาการ Authentication';
+    }
+    
+  window.showToast(errorMsg, 'error');
+  } finally {
+    // Re-enable button
+    btnStart.disabled = false;
+    btnStart.textContent = 'เริ่มเกม';
+  }
+});
+
+// Removed cancel button flow
+
+document.getElementById('btnReallyStart').addEventListener('click', async function() {
+  try {
+    const confirmCard = document.getElementById('confirmCard');
+    const quizCard = document.getElementById('quizCard');
+    
+    // Update player as ready using the stored reference
+    if (window.currentPlayerRef) {
+      await window.currentPlayerRef.set({ ready: true }, { merge: true });
+      console.log('Player marked as ready');
+    }
+    
+    confirmCard.classList.add('hidden');
+
+    // build shuffled order of 10 questions
+    if (!window.QUESTION_BANK) {
+  window.showToast('ไม่พบคำถาม กรุณาตรวจสอบ questions.js', 'error');
+      return;
+    }
+    
+    order = window.shuffle(window.QUESTION_BANK).slice(0, 10);
+    idx = 0; 
+    score = 0;
+    playerAnswers = []; // รีเซ็ตคำตอบ
+    quizCard.classList.remove('hidden');
+    showQuestion();
+    
+  } catch (error) {
+    console.error('Error starting quiz:', error);
+    window.showToast('เกิดข้อผิดพลาดในการเริ่มเกม: ' + error.message, 'error');
+  }
+});
+
+function showQuestion(){
+  const resultCard = document.getElementById('resultCard');
+  const quizCard = document.getElementById('quizCard');
+  const qIndexEl = document.getElementById('qIndex');
+  const qText = document.getElementById('qText');
+  const choiceList = document.getElementById('choiceList');
+  
+  if(idx >= order.length){
+    // finish - แสดงคำตอบของผู้เล่น
+    console.log('Game finished. Final score:', score);
+    displayPlayerAnswers();
+    resultCard.classList.remove('hidden');
+    quizCard.classList.add('hidden');
+    
+    // อัปเดต score ครั้งสุดท้าย
+    if (window.currentPlayerRef) {
+      console.log('Updating final score to Firestore:', score);
+      window.currentPlayerRef.set({ 
+        score: score,
+        gameCompleted: true,
+        completedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge:true}).then(() => {
+        console.log('Final score updated successfully');
+      }).catch((error) => {
+        console.error('Error updating final score:', error);
+      });
+    }
+    return;
+  }
+
+  const q = order[idx];
+  qIndexEl.textContent = String(idx+1);
+  qText.textContent = q.text;
+  choiceList.innerHTML = '';
+
+  const now = performance.now();
+  qShownAt = now;
+  startBar(now);
+
+  q.choices.forEach((label, i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.textContent = label;
+    btn.addEventListener('click', ()=>answer(q, i, btn));
+    choiceList.appendChild(btn);
+  });
+}
+
+function startBar(start){
+  timeBar.style.width = '0%';
+  if(timerId) cancelAnimationFrame(timerId);
+  const tick = ()=>{
+    const elapsed = performance.now() - start;
+    const ratio = Math.min(1, elapsed / MAX_TIME);
+    timeBar.style.width = (ratio*100).toFixed(2) + '%';
+    if(ratio < 1){ timerId = requestAnimationFrame(tick); }
+  };
+  timerId = requestAnimationFrame(tick);
+}
+
+async function answer(q, i, btnEl){
+  const choiceList = document.getElementById('choiceList');
+  
+  // disable all buttons
+  Array.from(choiceList.children).forEach(ch=>ch.disabled = true);
+  if(timerId) cancelAnimationFrame(timerId);
+
+  const elapsed = performance.now() - qShownAt;
+  const correct = (i === q.answer);
+  const pts = window.computePoints ? window.computePoints(correct, elapsed) : (correct ? 100 : 0);
+  
+  console.log('Answer processing:', {
+    questionIndex: idx + 1,
+    playerChoice: i,
+    correctAnswer: q.answer,
+    isCorrect: correct,
+    elapsed: elapsed,
+    points: pts,
+    hasComputePoints: !!window.computePoints
+  });
+
+  // เก็บคำตอบของผู้เล่น
+  playerAnswers.push({
+    questionIndex: idx,
+    questionText: q.text,
+    playerChoice: i,
+    playerChoiceText: q.choices[i],
+    correctAnswer: q.answer,
+    correctAnswerText: q.choices[q.answer],
+    isCorrect: correct,
+    points: pts
+  });
+
+  // ไม่แสดงคำตอบที่ถูกต้อง - เฉพาะบอกว่าตอบแล้ว
+  btnEl.style.backgroundColor = '#e5e7eb';
+  btnEl.style.borderColor = '#9ca3af';
+
+  // update score (ไม่แสดงในหน้า)
+  if(correct){
+    score += pts;
+    console.log(`Question ${idx + 1}: Correct! Points: ${pts}, Total score: ${score}`);
+  } else {
+    console.log(`Question ${idx + 1}: Wrong. Points: 0, Total score: ${score}`);
+  }
+  
+  console.log('Answer details:', {
+    questionIndex: idx,
+    correct: correct,
+    points: pts,
+    totalScore: score,
+    elapsed: elapsed
+  });
+  
+  // อัปเดตข้อมูลใน Firestore
+  try{
+    if (window.currentPlayerRef) {
+      console.log('Updating score in Firestore:', score);
+      await window.currentPlayerRef.set({
+        score: score,
+        lastAnswerAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }, {merge:true});
+      console.log('Score updated in Firestore successfully');
+    } else {
+      console.error('currentPlayerRef is null!');
+    }
+  }catch(e){ 
+    console.error('Error updating score:', e); 
+  }
+
+  // ไปคำถามต่อไป
+  setTimeout(()=>{
+    idx++;
+    showQuestion();
+  }, 800);
+}
+
+// ฟังก์ชันแสดงคำตอบของผู้เล่น
+// ฟังก์ชันแสดง "คำตอบที่เลือก" แบบไม่เฉลย/ไม่บอกถูกผิด
+function displayPlayerAnswers() {
+  const playerAnswersEl = document.getElementById('playerAnswers');
+  if (!playerAnswersEl) return;
+
+  // แสดงรายการคำตอบที่ผู้เล่นเลือกเท่านั้น
+  let html = '';
+  playerAnswers.forEach((ans, i) => {
+    html += `
+      <div style="
+        margin-bottom:12px;
+        padding:12px;
+        border:1px solid #e5e7eb;
+        border-radius:10px;
+        background:#fff;">
+        <div style="font-weight:700; margin-bottom:6px;">ข้อ ${i + 1}</div>
+        <div style="font-size:15px; color:#374151;">
+          <div style="margin-bottom:6px;"><strong>คำถาม:</strong> ${ans.questionText}</div>
+          <div><strong>คำตอบที่น้องๆเลือก:</strong> ${ans.playerChoiceText}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  // ส่วนหัวสรุปเล็ก ๆ (จำนวนข้อที่ตอบ)
+  const total = playerAnswers.length;
+  html = `
+    <div style="
+      text-align:center;
+      margin-bottom:16px;
+      padding:14px;
+      background:linear-gradient(45deg,#f3f4f6,#e5e7eb);
+      border-radius:12px;">
+      <div style="font-size:16px;">ตอบทั้งหมด <strong>${total}</strong> ข้อ</div>
+    </div>
+  ` + html;
+
+  playerAnswersEl.innerHTML = html;
+}
+
+</script>
+</body>
+</html>

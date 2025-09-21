@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</head>
+<body>
+  <style>
+    /* Floating audio toggle button (admin-only) */
+    .floating-audio-btn{
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 1000;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px; height: 48px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(17,24,39,0.75); /* slate-900/75 */
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      backdrop-filter: blur(6px);
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease, opacity .2s ease;
+    }
+    .floating-audio-btn:hover{ transform: translateY(-1px); box-shadow: 0 10px 28px rgba(0,0,0,0.3); background: rgba(17,24,39,0.85);}    
+    .floating-audio-btn:active{ transform: translateY(0); box-shadow:none; }
+    .floating-audio-btn[aria-pressed="true"]{ background: rgba(30,64,175,0.9); } /* playing: indigo */
+    .floating-audio-btn .icon{ font-size: 20px; line-height: 1; }
+    @media (max-width: 480px){ .floating-audio-btn{ right:12px; bottom:12px; width:44px; height:44px; } .floating-audio-btn .icon{ font-size: 18px; } }
+    /* Respect any print or reduced-motion scenarios */
+    @media (prefers-reduced-motion: reduce){ .floating-audio-btn{ transition: none; } }
+  </style>
+  <!-- Animated background: subtle grid + floating doodles -->
+  <div class="animated-bg" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-doodles">
+      <span class="doodle" style="--x:12%;  --size:48px; --delay:0s;">🎯</span>
+      <span class="doodle" style="--x:25%; --size:42px; --delay:0.5s;">📚</span>
+      <span class="doodle" style="--x:45%; --size:36px; --delay:1s;">✏️</span>
+      <span class="doodle" style="--x:62%; --size:52px; --delay:1.5s;">🎮</span>
+      <span class="doodle" style="--x:78%; --size:40px; --delay:2s;">🏆</span>
+      <span class="doodle" style="--x:90%; --size:44px; --delay:2.5s;">⭐</span>
+      <span class="doodle" style="--x:18%; --size:38px; --delay:3s;">🖊️</span>
+      <span class="doodle" style="--x:35%; --size:46px; --delay:3.5s;">📏</span>
+      <span class="doodle" style="--x:55%; --size:41px; --delay:4s;">🎊</span>
+      <span class="doodle" style="--x:72%; --size:39px; --delay:4.5s;">📚</span>
+      <span class="doodle" style="--x:85%; --size:43px; --delay:5s;">🚀</span>
+      <span class="doodle" style="--x:8%; --size:37px; --delay:5.5s;">🎉</span>
+    </div>
+  </div>
+
+  <!-- Animated QUIZ Text -->
+  <div class="animated-quiz-container">
+    <div class="animated-quiz">
+      <span class="quiz-letter" style="--delay: 0s;">Q</span>
+      <span class="quiz-letter" style="--delay: 0.2s;">u</span>
+      <span class="quiz-letter" style="--delay: 0.4s;">i</span>
+      <span class="quiz-letter" style="--delay: 0.6s;">z</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Background Music -->
+<audio id="bgMusic" preload="auto" loop muted playsinline>
+  <source src="CellOut.mp3" type="audio/mpeg">
+</audio>
+
+    <!-- Floating Play/Pause Button -->
+    <button id="audioToggle" type="button" class="floating-audio-btn" aria-label="สลับการเล่นเสียง" aria-pressed="false" title="เปิด/ปิดเสียง">
+      <span class="icon" id="audioIcon">🔇</span>
+    </button>
+    
+    <div class="header">
+      <div class="brand" style="gap:14px;">
+        <span class="dot"></span> 
+        <span>Vayu Few Few~~</span>
+        <a id="answersLink" class="btn" style="padding:8px 12px; display:inline-flex; align-items:center; gap:6px; font-size:13px; text-decoration:none; border-radius:10px;"
+           href="answers.html">
+          🧠 
+        </a>
+        <button id="btnReset" class="btn warn" style="padding:8px 12px; display:inline-flex; align-items:center; gap:6px; font-size:13px;">
+          ♻️ 
+        </button>
+      </div>
+
+      <!-- ปุ่มซ่อนข้อมูล + ป้ายห้อง -->
+      <div class="row" style="gap:8px; align-items:center;">
+        <button id="toggleName"  class="btn icon" title="ซ่อน/แสดงชื่อ">👁️ ชื่อ</button>
+        <button id="toggleScore" class="btn icon" title="ซ่อน/แสดงคะแนน">👁️ คะแนน</button>
+        <div class="badge">Room: <span class="mono" id="roomLabel"></span></div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="row">
+        <small class="muted"></small>
+      </div>
+
+      <section class="card">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h3 style="margin:0">ตารางคะแนนสุดตึงงง!</h3>
+          <div class="badge">ผู้เล่น: <span id="count" class="mono">0</span></div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="scorecard-wrapper">
+        <div id="nameMaskBar" class="name-mask-bar hidden" aria-hidden="true">
+          <span>ชื่อถูกซ่อน</span>
+        </div>
+        <div id="scoreMaskBar" class="score-mask-bar hidden" aria-hidden="true">
+          <span>คะแนนถูกซ่อน</span>
+        </div>
+        <table class="table score-table">
+          <thead><tr><th>#</th><th>ชื่อ</th><th>คะแนน</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <small class="muted"></small>
+      <small class="muted"> <span id="roomFooter" class="mono"></span></small>
+    </div>
+  </div>
+
+<script>
+const roomId = window.ROOM_ID;
+document.getElementById('roomLabel').textContent = roomId;
+document.getElementById('roomFooter').textContent = roomId;
+// Update answers link with room query
+const answersLink = document.getElementById('answersLink');
+if (answersLink && roomId) {
+  const url = new URL('answers.html', window.location.href);
+  url.searchParams.set('room', roomId);
+  answersLink.href = url.toString();
+}
+
+const tbody = document.getElementById('tbody');
+const countEl = document.getElementById('count');
+const bgMusic = document.getElementById('bgMusic');
+
+// === Toggle mask state ===
+const hideState = { name:false, score:false };
+
+function setEye(btn, on, label){
+  btn.textContent = (on ? '🙈 ' : '👁️ ') + label;
+}
+
+function applyMask(){
+  document.querySelectorAll('.cell-name').forEach(el => el.classList.toggle('masked', hideState.name));
+  document.querySelectorAll('.cell-score').forEach(el => el.classList.toggle('masked', hideState.score));
+  updateAllMasks();
+}
+
+// bind buttons
+const btnName  = document.getElementById('toggleName');
+const btnScore = document.getElementById('toggleScore');
+
+btnName.addEventListener('click',  ()=>{ hideState.name  = !hideState.name;  setEye(btnName,  hideState.name,  'ชื่อ');   applyMask(); });
+btnScore.addEventListener('click', ()=>{ hideState.score = !hideState.score; setEye(btnScore, hideState.score, 'คะแนน'); applyMask(); });
+
+// ตั้งค่าไอคอนเริ่มต้น
+setEye(btnName,  hideState.name,  'ชื่อ');
+setEye(btnScore, hideState.score, 'คะแนน');
+
+// Overlay bars for hiding columns
+const nameMaskBar  = document.getElementById('nameMaskBar');
+const scoreMaskBar = document.getElementById('scoreMaskBar');
+
+function updateColumnMask(options){
+  const { active, barEl, colIndex, leftVar, widthVar } = options;
+  if(!barEl) return;
+  const hasRows = tbody && tbody.querySelector('tr') && !tbody.querySelector('tr td[colspan]');
+  if(active && hasRows){
+    barEl.classList.remove('hidden');
+    const headerRow = document.querySelector('.score-table thead tr');
+    const hdrCells = headerRow ? headerRow.children : null;
+    const th = hdrCells && hdrCells[colIndex];
+    if(th){
+      const rect = th.getBoundingClientRect();
+      const tableRect = headerRow.parentElement.getBoundingClientRect();
+      const left = rect.left - tableRect.left;
+      barEl.style.setProperty(leftVar, left + 'px');
+      barEl.style.setProperty(widthVar, rect.width + 'px');
+    }
+  } else {
+    barEl.classList.add('hidden');
+  }
+}
+
+function updateAllMasks(){
+  updateColumnMask({ active: hideState.name,  barEl: nameMaskBar,  colIndex:1, leftVar:'--mask-left',        widthVar:'--mask-width' });
+  updateColumnMask({ active: hideState.score, barEl: scoreMaskBar, colIndex:2, leftVar:'--mask-left-score', widthVar:'--mask-width-score' });
+}
+window.addEventListener('resize', ()=>{ updateAllMasks(); });
+
+// Attempt ensure autoplay (some browsers require user gesture; if blocked just log)
+window.addEventListener('load', () => {
+  bgMusic.play().then(()=>{
+    // if autoplay succeeded, reflect state
+    updateAudioBtn();
+  }).catch(e => {
+    console.log('Autoplay blocked:', e);
+    updateAudioBtn();
+  });
+});
+
+document.getElementById('btnReset').addEventListener('click', async ()=>{
+  if(!confirm('ยืนยันล้างผู้เล่นทั้งหมดในห้องนี้?')) return;
+  await window.resetRoom();
+});
+
+// Floating audio toggle logic
+(function(){
+  const btn = document.getElementById('audioToggle');
+  const icon = document.getElementById('audioIcon');
+  if(!btn || !icon || !bgMusic) return;
+
+  function updateAudioBtn(){
+    const playing = !!(bgMusic && !bgMusic.paused && !bgMusic.ended);
+    btn.setAttribute('aria-pressed', playing ? 'true' : 'false');
+    icon.textContent = playing ? '🔊' : '🔇';
+    btn.title = playing ? 'หยุดเพลง' : 'เล่นเพลง';
+  }
+
+  // expose for load-init call above
+  window.updateAudioBtn = updateAudioBtn;
+
+  btn.addEventListener('click', async ()=>{
+    try{
+      if(bgMusic.paused){
+        await bgMusic.play();
+      }else{
+        bgMusic.pause();
+      }
+    }catch(err){
+      console.warn('Audio toggle failed:', err);
+    }finally{
+      updateAudioBtn();
+    }
+  });
+
+  // Keep icon in sync with media events
+  bgMusic.addEventListener('play', updateAudioBtn);
+  bgMusic.addEventListener('pause', updateAudioBtn);
+  bgMusic.addEventListener('ended', updateAudioBtn);
+  bgMusic.addEventListener('volumechange', updateAudioBtn);
+
+  // Initialize state (in case autoplay blocked before window load)
+  updateAudioBtn();
+})();
+
+// Anonymous auth (optional here, but harmless)
+window.ensureAnon().then(()=>{
+  const col = firebase.firestore().collection('rooms').doc(roomId).collection('players');
+  
+  // Listen for real-time updates with better error handling
+  col.orderBy('score', 'desc').onSnapshot((snap)=>{
+    console.log('Firestore snapshot received:', snap.size, 'documents');
+    
+    const rows = [];
+    countEl.textContent = String(snap.size);
+    let rank = 1;
+    
+    if (snap.empty) {
+      console.log('No players found in room:', roomId);
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #6b7280;">ยังไม่มีผู้เล่นในห้องนี้</td></tr>';
+      applyMask();
+      return;
+    }
+    
+    snap.forEach(doc=>{
+      const d = doc.data() || {};
+      const name = d.name || '(ไม่ระบุ)';
+      const score = d.score || 0;
+      const currentRank = rank++;
+      rows.push(`<tr>
+        <td>${currentRank}</td>
+        <td><span class="cell-name">${name}</span></td>
+        <td><b><span class="cell-score">${score}</span></b></td>
+      </tr>`);
+    });
+    
+    tbody.innerHTML = rows.join('');
+    applyMask(); // รักษาสถานะการซ่อนหลังจาก redraw
+    
+  }, (error) => {
+    console.error('Error listening to players:', error);
+  tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #dc2626;">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>';
+    applyMask();
+  });
+}).catch((error) => {
+  console.error('Authentication error:', error);
+});
+</script>
+</body>
+</html>

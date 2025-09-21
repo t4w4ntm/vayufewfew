@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>เฉลยคำตอบ (เลือกทดสอบได้)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <!-- ใช้คำถามชุดเดียวกับหน้าเล่น -->
+  <script src="questions.js"></script>
+  <style>
+    /* Animated Quiz Text สำหรับ Answer Sheet */
+    .quiz-text {
+      display: inline-flex;
+      gap: 2px;
+    }ฟ
+    
+    .quiz-text .letter {
+      display: inline-block;
+      animation: bounce-answer 3s ease-in-out infinite;
+      animation-fill-mode: both;
+    }
+    
+    .quiz-text .letter:nth-child(1) { animation-delay: 0s; }
+    .quiz-text .letter:nth-child(2) { animation-delay: 0.1s; }
+    .quiz-text .letter:nth-child(3) { animation-delay: 0.2s; }
+    .quiz-text .letter:nth-child(4) { animation-delay: 0.3s; }
+    .quiz-text .letter:nth-child(5) { animation-delay: 0.4s; }
+    .quiz-text .letter:nth-child(6) { animation-delay: 0.5s; }
+    .quiz-text .letter:nth-child(8) { animation-delay: 0.7s; }
+    .quiz-text .letter:nth-child(9) { animation-delay: 0.8s; }
+    .quiz-text .letter:nth-child(10) { animation-delay: 0.9s; }
+    .quiz-text .letter:nth-child(11) { animation-delay: 1s; }
+    .quiz-text .letter:nth-child(12) { animation-delay: 1.1s; }
+    
+    @keyframes bounce-answer {
+      0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0) rotate(0deg);
+        color: #2563eb;
+      }
+      10% {
+        transform: translateY(-8px) rotate(-2deg);
+        color: #16a34a;
+      }
+      30% {
+        transform: translateY(-4px) rotate(1deg);
+        color: #dc2626;
+      }
+      60% {
+        transform: translateY(-6px) rotate(-1deg);
+        color: #ca8a04;
+      }
+    }
+    
+    /* สีเพิ่มเติมสำหรับ Answer Sheet */
+    .choices .choice {
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .choices .choice:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .choices .choice.correct {
+      background-color: #16a34a;
+      color: white;
+      border-color: #15803d;
+      animation: correctPulse 0.6s ease;
+    }
+    
+    .choices .choice.wrong {
+      background-color: #dc2626;
+      color: white;
+      border-color: #b91c1c;
+      animation: wrongShake 0.6s ease;
+    }
+    
+    @keyframes correctPulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(22, 163, 74, 0.6); }
+      100% { transform: scale(1); }
+    }
+    
+    @keyframes wrongShake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+    
+    .card {
+      transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    /* Icon buttons in header */
+    .header-actions .icon-btn {
+      width:46px; height:46px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:22px;
+      background: linear-gradient(145deg,#1e3a8a,#1d4ed8);
+      border:2px solid #1d4ed8;
+      border-radius:14px;
+      color:#fff;
+      cursor:pointer;
+      position:relative;
+      transition:.25s ease;
+      box-shadow:0 4px 14px -3px rgba(30,64,175,.55);
+    }
+    .header-actions .icon-btn:hover { transform:translateY(-3px); box-shadow:0 10px 24px -5px rgba(30,64,175,.55); }
+    .header-actions .icon-btn:active { transform:translateY(-1px) scale(.94); }
+    .header-actions .icon-btn#btnReset { background: linear-gradient(145deg,#15803d,#16a34a); border-color:#15803d; box-shadow:0 4px 14px -3px rgba(22,163,74,.55); }
+    .header-actions .icon-btn#btnReset:hover { box-shadow:0 10px 24px -5px rgba(22,163,74,.55); }
+    .header-actions .icon-btn:focus-visible { outline:3px solid #fbbf24; outline-offset:2px; }
+    @media (max-width:560px){
+      .header-actions .icon-btn { width:42px; height:42px; font-size:20px; }
+      .brand .quiz-text { font-size:15px; }
+    }
+    
+    /* Footer button styles */
+    .footer .btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+    }
+    
+    .footer .btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+  </style>
+</head>
+<body>
+  <!-- Animated background: subtle grid + floating doodles -->
+  <div class="animated-bg" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-doodles">
+      <span class="doodle" style="--x:10%;  --size:42px; --delay:0s;">📝</span>
+      <span class="doodle" style="--x:25%; --size:38px; --delay:1s;">✅</span>
+      <span class="doodle" style="--x:42%; --size:44px; --delay:2s;">📚</span>
+      <span class="doodle" style="--x:58%; --size:36px; --delay:1.5s;">🎯</span>
+      <span class="doodle" style="--x:75%; --size:40px; --delay:2.5s;">💡</span>
+      <span class="doodle" style="--x:88%; --size:38px; --delay:3s;">⭐</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <div class="brand" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="dot"></span>
+          <span class="quiz-text">
+            <span class="letter">A</span>
+            <span class="letter">n</span>
+            <span class="letter">s</span>
+            <span class="letter">w</span>
+            <span class="letter">e</span>
+            <span class="letter">r</span>
+            <span style="margin: 0 6px;"></span>
+            <span class="letter">S</span>
+            <span class="letter">h</span>
+            <span class="letter">e</span>
+            <span class="letter">e</span>
+            <span class="letter">t</span>
+          </span>
+        </div>
+        <div class="header-actions" style="display:flex; gap:10px; margin-left:auto;">
+          <a href="index.html" class="icon-btn" aria-label="กลับหน้าเล่น" title="กลับหน้าเล่น">🎮</a>
+          <a href="admin.html" class="icon-btn" aria-label="ตารางคะแนน" title="ตารางคะแนน">📊</a>
+          <button id="btnReset" class="icon-btn" aria-label="ล้างการเลือกทั้งหมด" title="ล้างการเลือกทั้งหมด" type="button">♻️</button>
+        </div>
+        <div class="badge" style="margin-left:0;">10 ข้อ</div>
+      </div>
+    </div>
+
+    <div class="main" id="list" style="padding-bottom:40px;"></div>
+  </div>
+
+<script>
+// ==== Build a 10-question answer sheet (click-to-check) ====
+const list = document.getElementById('list');
+const bank = (window.QUESTION_BANK || []).slice(0, 10); // เอา 10 ข้อแรก เรียงตามไฟล์
+
+bank.forEach((q, qi) => {
+  const card = document.createElement('section');
+  card.className = 'card';
+  card.style.marginBottom = '20px';
+
+  const head = document.createElement('div');
+  head.className = 'row';
+  head.style.justifyContent = 'space-between';
+  head.style.alignItems = 'center';
+  head.style.marginBottom = '12px';
+  head.innerHTML = `
+    <div class="badge" style="font-weight: 600;">📝 ข้อ ${qi+1}</div>
+    <div class="badge" style="background: #f3f4f6; color: #6b7280; font-size: 13px;"></div>
+  `;
+  card.appendChild(head);
+
+  const h3 = document.createElement('h3');
+  h3.textContent = q.text;
+  h3.style.marginBottom = '16px';
+  h3.style.lineHeight = '1.4';
+  card.appendChild(h3);
+
+  const choices = document.createElement('div');
+  choices.className = 'choices';
+  choices.style.gap = '8px';
+  q.choices.forEach((label, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'choice';
+    btn.textContent = label;
+
+    // เมื่อคลิก: ถูก=เขียว, ผิด=แดง; ล็อกคำตอบของ "ข้อนี้" เท่านั้น
+    btn.addEventListener('click', () => {
+      // หากตอบไปแล้ว ไม่ให้เปลี่ยน
+      if ([...choices.children].some(el => el.classList.contains('correct') || el.classList.contains('wrong'))) return;
+
+      const isCorrect = (i === q.answer);
+      
+      // เพิ่ม loading state สั้นๆ
+      btn.style.transform = 'scale(0.95)';
+      btn.style.opacity = '0.7';
+      
+      setTimeout(() => {
+        if (isCorrect) {
+          btn.classList.add('correct');
+          // เล่นเสียง success (ถ้ามี)
+          console.log('✅ ถูกต้อง!', `ข้อ ${qi+1}`);
+        } else {
+          btn.classList.add('wrong');
+          // ไฮไลต์ตัวเลือกที่ถูกด้วย เพื่อให้รู้คำตอบที่ถูก
+          const rightEl = choices.children[q.answer];
+          if (rightEl) {
+            setTimeout(() => rightEl.classList.add('correct'), 300);
+          }
+          console.log('❌ ผิด!', `ข้อ ${qi+1} คำตอบที่ถูก: ${q.choices[q.answer]}`);
+        }
+        
+        // ล็อกปุ่มอื่น ๆ ของข้อนี้
+        [...choices.children].forEach(el => {
+          el.disabled = true;
+          if (!el.classList.contains('correct') && !el.classList.contains('wrong')) {
+            el.style.opacity = '0.5';
+          }
+        });
+        
+        btn.style.transform = '';
+        btn.style.opacity = '';
+      }, 200);
+    });
+
+    choices.appendChild(btn);
+  });
+  card.appendChild(choices);
+  list.appendChild(card);
+});
+
+// ปุ่มล้างการเลือกทั้งหมด (รีวิวใหม่ได้)
+document.getElementById('btnReset').addEventListener('click', () => {
+  const resetBtn = document.getElementById('btnReset');
+  const originalText = resetBtn.textContent;
+  
+  document.querySelectorAll('.choice').forEach(el => {
+    el.classList.remove('correct','wrong');
+    el.disabled = false;
+  });
+  
+  // แสดง feedback
+  resetBtn.textContent = '♻️';
+  resetBtn.style.background = '#16a34a';
+  
+  setTimeout(() => {
+    resetBtn.textContent = originalText;
+    resetBtn.style.background = '';
+  }, 2000);
+});
+</script>
+</body>
