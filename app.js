@@ -11,7 +11,7 @@
 // Scoring constants
 window.SCORE_BASE = 100;           // points for correct answer
 window.SPEED_BONUS_MAX = 1000;      // max extra for instant correct
-window.SPEED_BONUS_WINDOW_MS = 50000; // full bonus at 0ms, linearly to 0 at 50s
+window.SPEED_BONUS_WINDOW_MS = 60000; // full bonus at 0ms, linearly to 0 at 60s
 
 // Firebase init
 ;(function(){

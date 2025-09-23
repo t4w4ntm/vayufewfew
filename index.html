@@ -77,7 +77,7 @@
       <section id="quizCard" class="card hidden">
         <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:12px;">
           <div class="badge">ผู้เล่น: <span id="playerName" class="mono"></span></div>
-          <div class="badge">ข้อ <span id="qIndex">1</span>/10</div>
+          <div class="badge">ข้อ <span id="qIndex">1</span>/<span id="qTotal">20</span></div>
         </div>
         <div class="progress" aria-label="time">
           <div id="timeBar" class="progress__bar"></div>
@@ -89,7 +89,7 @@
 
       <section id="resultCard" class="card center hidden">
         <h2>เก่งมาก!</h2>
-        <p>อย่าพึ่งปิดหน้านี้! รอเฉลยจากพี่เอิร์ทสุดหล่อนะจ้ะ</p>
+        <p>อย่าพึ่งปิดหน้านี้! รอเฉลยจากพี่เอิร์ทสุดหล่อนะจ๊ะ</p>
         <div style="height:20px"></div>
         <div id="answerSummary">
           <h3>ตอบอะไรมั่งคับน้อง</h3>
@@ -165,6 +165,7 @@ const choiceList = document.getElementById('choiceList');
 const timeBar = document.getElementById('timeBar');
 const scoreEl = document.getElementById('score');
 const qIndexEl = document.getElementById('qIndex');
+const qTotalEl = document.getElementById('qTotal');
 const playerNameEl = document.getElementById('playerName');
 const finalScoreEl = document.getElementById('finalScore');
 
@@ -280,16 +281,26 @@ document.getElementById('btnReallyStart').addEventListener('click', async functi
     
     confirmCard.classList.add('hidden');
 
-    // build shuffled order of 10 questions
+    // build shuffled order of up to 20 questions
     if (!window.QUESTION_BANK) {
   window.showToast('ไม่พบคำถาม กรุณาตรวจสอบ questions.js', 'error');
       return;
     }
     
-    order = window.shuffle(window.QUESTION_BANK).slice(0, 10);
+    const total = Math.min(20, window.QUESTION_BANK.length);
+    const baseOrder = window.shuffle(window.QUESTION_BANK).slice(0, total);
+    // Shuffle choices per question (per player) while keeping correct answer mapping
+    order = baseOrder.map((q)=>{
+      const idxs = q.choices.map((_, i)=> i);
+      const shuffled = (window.shuffle ? window.shuffle(idxs) : idxs.sort(()=> Math.random() - 0.5));
+      const choices = shuffled.map(i => q.choices[i]);
+      const answer = shuffled.indexOf(q.answer);
+      return { ...q, choices, answer };
+    });
     idx = 0; 
     score = 0;
     playerAnswers = []; // รีเซ็ตคำตอบ
+    if (qTotalEl) { qTotalEl.textContent = String(order.length); }
     quizCard.classList.remove('hidden');
     showQuestion();
     

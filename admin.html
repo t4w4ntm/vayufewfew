@@ -111,6 +111,19 @@
   </div>
 
   <div class="container">
+    <!-- Admin Auth Modal -->
+    <div id="modalAuth" class="modal-overlay hidden">
+      <div class="modal-box">
+        <div class="modal-title">อย่าเหลี่ยมๆตั้งใจทำ</div>
+        <div style="margin-bottom:14px;">
+          <input id="authInput" type="password" class="name-input" placeholder="ก็ลองทายดูสิ? {1546}" style="width:100%;" />
+        </div>
+        <div class="modal-actions" style="margin-bottom:8px;">
+          <button id="authConfirm" class="btn primary">เข้าสู่ระบบ</button>
+        </div>
+        <div id="authError" style="color:#dc2626; min-height:20px;"></div>
+      </div>
+    </div>
     <!-- Background Music -->
     <audio id="bgMusic" loop autoplay playsinline>
       <source src="CellOut.wav" type="audio/wav">
@@ -187,6 +200,10 @@
   </div>
 
 <script>
+// --- Simple Admin PIN Gate (hardcoded) ---
+const ADMIN_PIN = '2468'; // TODO: เปลี่ยนรหัสตามต้องการ
+const AUTH_KEY  = 'adminUnlocked';
+
 const roomId = window.ROOM_ID;
 document.getElementById('roomLabel').textContent = roomId;
 document.getElementById('roomFooter').textContent = roomId;
@@ -285,6 +302,7 @@ function hideModal() {
 
 document.getElementById('btnReset').addEventListener('click', () => {
   showModal();
+
 });
 
 btnModalCancel.addEventListener('click', hideModal);
@@ -339,48 +357,102 @@ modalReset.addEventListener('click', (e) => {
   updateAudioBtn();
 })();
 
-// Anonymous auth (optional here, but harmless)
-window.ensureAnon().then(()=>{
-  const col = firebase.firestore().collection('rooms').doc(roomId).collection('players');
-  
-  // Listen for real-time updates with better error handling
-  col.orderBy('score', 'desc').onSnapshot((snap)=>{
-    console.log('Firestore snapshot received:', snap.size, 'documents');
+// Wrap realtime init so we can call it after PIN unlock
+function startRealtime(){
+  if (window.__realtimeStarted__) return;
+  window.__realtimeStarted__ = true;
+
+  window.ensureAnon().then(()=>{
+    const col = firebase.firestore().collection('rooms').doc(roomId).collection('players');
     
-    const rows = [];
-    countEl.textContent = String(snap.size);
-    let rank = 1;
-    
-    if (snap.empty) {
-      console.log('No players found in room:', roomId);
-      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #6b7280;">ยังไม่มีผู้เล่นในห้องนี้</td></tr>';
+    // Listen for real-time updates with better error handling
+    col.orderBy('score', 'desc').onSnapshot((snap)=>{
+      console.log('Firestore snapshot received:', snap.size, 'documents');
+      
+      const rows = [];
+      countEl.textContent = String(snap.size);
+      let rank = 1;
+      
+      if (snap.empty) {
+        console.log('No players found in room:', roomId);
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #6b7280;">ยังไม่มีผู้เล่นในห้องนี้</td></tr>';
+        applyMask();
+        return;
+      }
+      
+      snap.forEach(doc=>{
+        const d = doc.data() || {};
+        const name = d.name || '(ไม่ระบุ)';
+        const score = d.score || 0;
+        const currentRank = rank++;
+        rows.push(`<tr>
+          <td>${currentRank}</td>
+          <td><span class="cell-name">${name}</span></td>
+          <td><b><span class="cell-score">${score}</span></b></td>
+        </tr>`);
+      });
+      
+      tbody.innerHTML = rows.join('');
+      applyMask(); // รักษาสถานะการซ่อนหลังจาก redraw
+      
+    }, (error) => {
+      console.error('Error listening to players:', error);
+      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #dc2626;">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>';
       applyMask();
-      return;
-    }
-    
-    snap.forEach(doc=>{
-      const d = doc.data() || {};
-      const name = d.name || '(ไม่ระบุ)';
-      const score = d.score || 0;
-      const currentRank = rank++;
-      rows.push(`<tr>
-        <td>${currentRank}</td>
-        <td><span class="cell-name">${name}</span></td>
-        <td><b><span class="cell-score">${score}</span></b></td>
-      </tr>`);
     });
-    
-    tbody.innerHTML = rows.join('');
-    applyMask(); // รักษาสถานะการซ่อนหลังจาก redraw
-    
-  }, (error) => {
-    console.error('Error listening to players:', error);
-  tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #dc2626;">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>';
-    applyMask();
+  }).catch((error) => {
+    console.error('Authentication error:', error);
   });
-}).catch((error) => {
-  console.error('Authentication error:', error);
-});
+}
+
+// Auth modal logic
+(function(){
+  const modalAuth   = document.getElementById('modalAuth');
+  const authInput   = document.getElementById('authInput');
+  const authBtn     = document.getElementById('authConfirm');
+  const authError   = document.getElementById('authError');
+  const container   = document.querySelector('.container');
+
+  function showAuth(){
+    if (modalAuth){
+      modalAuth.classList.remove('hidden');
+      document.body.classList.add('modal-open');
+      setTimeout(()=>{ authInput && authInput.focus(); }, 0);
+    }
+    try{ if (bgMusic && !bgMusic.paused) { bgMusic.pause(); if (window.updateAudioBtn) window.updateAudioBtn(); } }catch(_){}
+  }
+
+  function hideAuth(){
+    if (modalAuth){
+      modalAuth.classList.add('hidden');
+      document.body.classList.remove('modal-open');
+    }
+  }
+
+  function tryUnlock(){
+    const pin = (authInput && authInput.value) || '';
+    if (pin === ADMIN_PIN){
+      sessionStorage.setItem(AUTH_KEY, '1');
+      authError.textContent = '';
+      hideAuth();
+      startRealtime();
+    }else{
+      authError.textContent = 'รหัสไม่ถูกต้อง ลองอีกครั้ง';
+      if (authInput){ authInput.select(); }
+    }
+  }
+
+  if (authBtn) authBtn.addEventListener('click', tryUnlock);
+  if (authInput) authInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') tryUnlock(); });
+
+  // Decide to show or skip auth
+  if (sessionStorage.getItem(AUTH_KEY) === '1'){
+    hideAuth();
+    startRealtime();
+  } else {
+    showAuth();
+  }
+})();
 </script>
 </body>
 </html>

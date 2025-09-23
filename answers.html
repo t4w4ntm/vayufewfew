@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>เฉลยคำตอบ (เลือกทดสอบได้)</title>
+  <title>เฉลยคำตอบ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
     .quiz-text {
       display: inline-flex;
       gap: 2px;
-    }ฟ
+    }
     
     .quiz-text .letter {
       display: inline-block;
@@ -134,6 +134,41 @@
     .footer .btn:active {
       transform: translateY(0) scale(0.98);
     }
+
+    /* Modal styles (reuse from admin) */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity .2s;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-box {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      padding: 32px 24px 20px 24px;
+      min-width: 280px;
+      max-width: 90vw;
+      text-align: center;
+      font-family: inherit;
+    }
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 18px;
+      color: #333;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+    }
+    body.modal-open { overflow: hidden; }
   </style>
 </head>
 <body>
@@ -151,6 +186,19 @@
   </div>
 
   <div class="container">
+    <!-- Answers Auth Modal -->
+    <div id="modalAuth" class="modal-overlay hidden" aria-hidden="true">
+      <div class="modal-box">
+        <div class="modal-title">อย่าเหลี่ยมๆตั้งใจทำ</div>
+        <div style="margin-bottom:14px;">
+          <input id="authInput" type="password" class="name-input" placeholder="ก็ลองทายดูสิ? {1546}" style="width:100%;" />
+        </div>
+        <div class="modal-actions" style="margin-bottom:8px;">
+          <button id="authConfirm" class="btn primary">เข้าสู่ระบบ</button>
+        </div>
+        <div id="authError" style="color:#dc2626; min-height:20px;"></div>
+      </div>
+    </div>
     <div class="header">
       <div class="brand" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -175,111 +223,159 @@
           <a href="admin.html" class="icon-btn" aria-label="ตารางคะแนน" title="ตารางคะแนน">📊</a>
           <button id="btnReset" class="icon-btn" aria-label="ล้างการเลือกทั้งหมด" title="ล้างการเลือกทั้งหมด" type="button">♻️</button>
         </div>
-        <div class="badge" style="margin-left:0;">10 ข้อ</div>
+  <div class="badge" id="qCountBadge" style="margin-left:0;">– ข้อ</div>
       </div>
     </div>
 
     <div class="main" id="list" style="padding-bottom:40px;"></div>
   </div>
-
 <script>
-// ==== Build a 10-question answer sheet (click-to-check) ====
-const list = document.getElementById('list');
-const bank = (window.QUESTION_BANK || []).slice(0, 10); // เอา 10 ข้อแรก เรียงตามไฟล์
+// --- Simple PIN Gate ---
+const ADMIN_PIN = '2468';
+const AUTH_KEY  = 'adminUnlocked';
 
-bank.forEach((q, qi) => {
-  const card = document.createElement('section');
-  card.className = 'card';
-  card.style.marginBottom = '20px';
+function startAnswers(){
+  // ==== Build up to 20-question answer sheet (click-to-check) ====
+  const list = document.getElementById('list');
+  const all = (window.QUESTION_BANK || []);
+  const total = Math.min(20, all.length);
+  const bank = all.slice(0, total); // เอา 20 ข้อแรก (หรือเท่าที่มี)
 
-  const head = document.createElement('div');
-  head.className = 'row';
-  head.style.justifyContent = 'space-between';
-  head.style.alignItems = 'center';
-  head.style.marginBottom = '12px';
-  head.innerHTML = `
-    <div class="badge" style="font-weight: 600;">📝 ข้อ ${qi+1}</div>
-    <div class="badge" style="background: #f3f4f6; color: #6b7280; font-size: 13px;"></div>
-  `;
-  card.appendChild(head);
+  // update header badge
+  const qCountBadge = document.getElementById('qCountBadge');
+  if (qCountBadge) qCountBadge.textContent = `${total} ข้อ`;
 
-  const h3 = document.createElement('h3');
-  h3.textContent = q.text;
-  h3.style.marginBottom = '16px';
-  h3.style.lineHeight = '1.4';
-  card.appendChild(h3);
+  bank.forEach((q, qi) => {
+    const card = document.createElement('section');
+    card.className = 'card';
+    card.style.marginBottom = '20px';
 
-  const choices = document.createElement('div');
-  choices.className = 'choices';
-  choices.style.gap = '8px';
-  q.choices.forEach((label, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'choice';
-    btn.textContent = label;
+    const head = document.createElement('div');
+    head.className = 'row';
+    head.style.justifyContent = 'space-between';
+    head.style.alignItems = 'center';
+    head.style.marginBottom = '12px';
+    head.innerHTML = `
+      <div class="badge" style="font-weight: 600;">📝 ข้อ ${qi+1}</div>
+      <div class="badge" style="background: #f3f4f6; color: #6b7280; font-size: 13px;"></div>
+    `;
+    card.appendChild(head);
 
-    // เมื่อคลิก: ถูก=เขียว, ผิด=แดง; ล็อกคำตอบของ "ข้อนี้" เท่านั้น
-    btn.addEventListener('click', () => {
-      // หากตอบไปแล้ว ไม่ให้เปลี่ยน
-      if ([...choices.children].some(el => el.classList.contains('correct') || el.classList.contains('wrong'))) return;
+    const h3 = document.createElement('h3');
+    h3.textContent = q.text;
+    h3.style.marginBottom = '16px';
+    h3.style.lineHeight = '1.4';
+    card.appendChild(h3);
 
-      const isCorrect = (i === q.answer);
-      
-      // เพิ่ม loading state สั้นๆ
-      btn.style.transform = 'scale(0.95)';
-      btn.style.opacity = '0.7';
-      
-      setTimeout(() => {
-        if (isCorrect) {
-          btn.classList.add('correct');
-          // เล่นเสียง success (ถ้ามี)
-          console.log('✅ ถูกต้อง!', `ข้อ ${qi+1}`);
-        } else {
-          btn.classList.add('wrong');
-          // ไฮไลต์ตัวเลือกที่ถูกด้วย เพื่อให้รู้คำตอบที่ถูก
-          const rightEl = choices.children[q.answer];
-          if (rightEl) {
-            setTimeout(() => rightEl.classList.add('correct'), 300);
-          }
-          console.log('❌ ผิด!', `ข้อ ${qi+1} คำตอบที่ถูก: ${q.choices[q.answer]}`);
-        }
+    const choices = document.createElement('div');
+    choices.className = 'choices';
+    choices.style.gap = '8px';
+    q.choices.forEach((label, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'choice';
+      btn.textContent = label;
+
+      // เมื่อคลิก: ถูก=เขียว, ผิด=แดง; ล็อกคำตอบของ "ข้อนี้" เท่านั้น
+      btn.addEventListener('click', () => {
+        // หากตอบไปแล้ว ไม่ให้เปลี่ยน
+        if ([...choices.children].some(el => el.classList.contains('correct') || el.classList.contains('wrong'))) return;
+
+        const isCorrect = (i === q.answer);
         
-        // ล็อกปุ่มอื่น ๆ ของข้อนี้
-        [...choices.children].forEach(el => {
-          el.disabled = true;
-          if (!el.classList.contains('correct') && !el.classList.contains('wrong')) {
-            el.style.opacity = '0.5';
-          }
-        });
+        // เพิ่ม loading state สั้นๆ
+        btn.style.transform = 'scale(0.95)';
+        btn.style.opacity = '0.7';
         
-        btn.style.transform = '';
-        btn.style.opacity = '';
-      }, 200);
+        setTimeout(() => {
+          if (isCorrect) {
+            btn.classList.add('correct');
+            console.log('✅ ถูกต้อง!', `ข้อ ${qi+1}`);
+          } else {
+            btn.classList.add('wrong');
+            const rightEl = choices.children[q.answer];
+            if (rightEl) {
+              setTimeout(() => rightEl.classList.add('correct'), 300);
+            }
+            console.log('❌ ผิด!', `ข้อ ${qi+1} คำตอบที่ถูก: ${q.choices[q.answer]}`);
+          }
+          
+          // ล็อกปุ่มอื่น ๆ ของข้อนี้
+          [...choices.children].forEach(el => {
+            el.disabled = true;
+          });
+          
+          btn.style.transform = '';
+          btn.style.opacity = '';
+        }, 200);
+      });
+
+      choices.appendChild(btn);
     });
-
-    choices.appendChild(btn);
+    card.appendChild(choices);
+    list.appendChild(card);
   });
-  card.appendChild(choices);
-  list.appendChild(card);
-});
 
-// ปุ่มล้างการเลือกทั้งหมด (รีวิวใหม่ได้)
-document.getElementById('btnReset').addEventListener('click', () => {
-  const resetBtn = document.getElementById('btnReset');
-  const originalText = resetBtn.textContent;
-  
-  document.querySelectorAll('.choice').forEach(el => {
-    el.classList.remove('correct','wrong');
-    el.disabled = false;
+  // ปุ่มล้างการเลือกทั้งหมด (รีวิวใหม่ได้)
+  document.getElementById('btnReset').addEventListener('click', () => {
+    const resetBtn = document.getElementById('btnReset');
+    const originalText = resetBtn.textContent;
+    
+    document.querySelectorAll('.choice').forEach(el => {
+      el.classList.remove('correct','wrong');
+      el.disabled = false;
+      el.style.opacity = '';
+    });
+    
+    // แสดง feedback
+    resetBtn.textContent = '♻️';
+    resetBtn.style.background = '#16a34a';
+    
+    setTimeout(() => {
+      resetBtn.textContent = originalText;
+      resetBtn.style.background = '';
+    }, 2000);
   });
-  
-  // แสดง feedback
-  resetBtn.textContent = '♻️';
-  resetBtn.style.background = '#16a34a';
-  
-  setTimeout(() => {
-    resetBtn.textContent = originalText;
-    resetBtn.style.background = '';
-  }, 2000);
-});
+}
+
+(function(){
+  // Skip auth if already unlocked in this tab (e.g. via admin)
+  if (sessionStorage.getItem(AUTH_KEY) === '1'){
+    startAnswers();
+    return;
+  }
+
+  const modalAuth = document.getElementById('modalAuth');
+  const authInput = document.getElementById('authInput');
+  const authBtn   = document.getElementById('authConfirm');
+  const authError = document.getElementById('authError');
+
+  function showAuth(){
+    modalAuth.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    setTimeout(()=>{ authInput && authInput.focus(); }, 0);
+  }
+  function hideAuth(){
+    modalAuth.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+  }
+  function tryUnlock(){
+    const pin = (authInput && authInput.value) || '';
+    if (pin === ADMIN_PIN){
+      sessionStorage.setItem(AUTH_KEY, '1');
+      authError.textContent = '';
+      hideAuth();
+      startAnswers();
+    } else {
+      authError.textContent = 'ว้ายๆ โดนหลอก';
+      if (authInput){ authInput.select(); }
+    }
+  }
+
+  if (authBtn) authBtn.addEventListener('click', tryUnlock);
+  if (authInput) authInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') tryUnlock(); });
+
+  showAuth();
+})();
 </script>
 </body>
+</html>
