@@ -87,7 +87,7 @@ window.QUESTION_BANK = [
     id: 'pt3',
     text: 'ข้อใด “ตรง” กับความต่างระหว่าง Prototype vs Final Product',
     choices: [
-      'Prototype เน้นยืดหยุ่น/ทดลองได้เร็ว; Final เน้นมาตรฐานและความสม่ำเสมอ',
+      'Prototype เน้นยืดหยุ่น/ทดลองได้เร็ว Final เน้นมาตรฐานและความสม่ำเสมอ',
       'Prototype ต้องสวยที่สุดเสมอ',
       'Final ไม่ต้องคำนึงความปลอดภัย',
       'ทั้งคู่ทำจากวัสดุเดียวกันเสมอ'
@@ -110,9 +110,9 @@ window.QUESTION_BANK = [
     id: 'pt5',
     text: '“Horizontal vs Vertical prototype” หมายถึงอะไร',
     choices: [
-      'Horizontal = UI/เปลือกกว้าง ๆ; Vertical = เจาะลึกฟังก์ชัน/เทคนิคหลัก',
-      'Horizontal = ฮาร์ดแวร์; Vertical = ซอฟต์แวร์',
-      'Horizontal = ต้นทุนต่ำ; Vertical = ต้นทุนสูง',
+      'Horizontal = UI/เปลือกกว้าง ๆ Vertical = เจาะลึกฟังก์ชัน/เทคนิคหลัก',
+      'Horizontal = ฮาร์ดแวร์ Vertical = ซอฟต์แวร์',
+      'Horizontal = ต้นทุนต่ำ Vertical = ต้นทุนสูง',
       'ทั้งสองเหมือนกัน'
     ],
     answer: 0
